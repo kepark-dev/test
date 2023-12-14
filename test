@@ -1,0 +1,46 @@
+function searchNestedJson(data, targetKey, targetValue, path = []) {
+    const results = [];
+
+    function searchRecursive(currentData, currentPath) {
+        if (typeof currentData === 'object' && currentData !== null) {
+            for (const key in currentData) {
+                const newPath = [...currentPath, key];
+                const value = currentData[key];
+
+                if ((key === targetKey || targetKey === '*') &&
+                    (value === targetValue || targetValue === '*')) {
+                    results.push(newPath);
+                }
+
+                if (typeof value === 'object' && value !== null) {
+                    searchRecursive(value, newPath);
+                }
+            }
+        }
+    }
+
+    searchRecursive(data, path);
+    return results;
+}
+
+// Example usage:
+const jsonData = {
+    "name": "John",
+    "info": {
+        "age": 30,
+        "address": {
+            "city": "New York",
+            "zipcode": "10001"
+        }
+    },
+    "contacts": [
+        {"type": "email", "value": "john@example.com"},
+        {"type": "phone", "value": "555-1234"}
+    ]
+};
+
+const targetKey = "*";
+const targetValue = "10001";
+const paths = searchNestedJson(jsonData, targetKey, targetValue);
+
+console.log(`Paths for key '${targetKey}' and value '${targetValue}':`, paths);
