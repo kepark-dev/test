@@ -1,46 +1,86 @@
-function searchNestedJson(data, targetKey, targetValue, path = []) {
-    const results = [];
+function searchJson(jsonData, targetFileName) {
+    const paths = [];
 
-    function searchRecursive(currentData, currentPath) {
-        if (typeof currentData === 'object' && currentData !== null) {
-            for (const key in currentData) {
-                const newPath = [...currentPath, key];
-                const value = currentData[key];
+    function searchRecursive(data, currentPath) {
+        if (data.name === targetFileName) {
+            paths.push(currentPath.join('/'));
+        }
 
-                if ((key === targetKey || targetKey === '*') &&
-                    (value === targetValue || targetValue === '*')) {
-                    results.push(newPath);
-                }
-
-                if (typeof value === 'object' && value !== null) {
-                    searchRecursive(value, newPath);
-                }
+        if (data.children) {
+            for (let i = 0; i < data.children.length; i++) {
+                const newPath = [...currentPath, data.children[i].name];
+                searchRecursive(data.children[i], newPath);
             }
         }
     }
 
-    searchRecursive(data, path);
-    return results;
+    searchRecursive(jsonData, [jsonData.name]);
+    return paths;
 }
 
 // Example usage:
 const jsonData = {
-    "name": "John",
-    "info": {
-        "age": 30,
-        "address": {
-            "city": "New York",
-            "zipcode": "10001"
+    "children": [
+        {
+            "children": [
+                {
+                    "children": [
+                        {
+                            "name": "MAC2230.csv"
+                        },
+                        {
+                            "name": "MAC2230.csv"
+                        },
+                        {
+                            "name": "MAC2230.csv"
+                        }
+                    ],
+                    "name": "CNO/Book_close"
+                },
+                {
+                    "children": [
+                        {
+                            "name": "nook.cvs"
+                        }
+                    ],
+                    "name": "CNO/Book_Only"
+                }
+            ],
+            "name": "CNO"
+        },
+        {
+            "children": [
+                {
+                    "children": [
+                        {
+                            "name": "MBC2230.csv"
+                        },
+                        {
+                            "name": "NMC2230.csv"
+                        },
+                        {
+                            "name": "GBC2230.csv"
+                        }
+                    ],
+                    "name": "CKO/Book_end"
+                },
+                {
+                    "children": [
+                        {
+                            "name": "nook.cvs"
+                        }
+                    ],
+                    "name": "CKO/math"
+                }
+            ],
+            "name": "CKO"
         }
-    },
-    "contacts": [
-        {"type": "email", "value": "john@example.com"},
-        {"type": "phone", "value": "555-1234"}
-    ]
+    ],
+    "name": "ABCReports"
 };
 
-const targetKey = "*";
-const targetValue = "10001";
-const paths = searchNestedJson(jsonData, targetKey, targetValue);
+const targetFileName = "MBC2230.csv";
+const paths = searchJson(jsonData, targetFileName);
 
-console.log(`Paths for key '${targetKey}' and value '${targetValue}':`, paths);
+console.log(`Paths for file name '${targetFileName}':`);
+paths.forEach(path => console.log(path));
