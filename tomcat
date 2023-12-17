@@ -1,0 +1,24 @@
+#!/bin/bash
+
+URL_TO_MONITOR="http://localhost:8080"
+TOMCAT_RESTART_COMMAND="sudo systemctl restart tomcat"
+EMAIL_TO="your_email@example.com"
+LOG_FILE="/path/to/log.txt"
+CHECK_INTERVAL_SECONDS=60
+
+while true; do
+    if curl --output /dev/null --silent --head --fail "$URL_TO_MONITOR"; then
+        echo "[$(date)] URL '$URL_TO_MONITOR' is up."
+    else
+        echo "[$(date)] URL '$URL_TO_MONITOR' is down. Restarting Tomcat..."
+        $TOMCAT_RESTART_COMMAND
+
+        # Send an email
+        echo "Tomcat Restarted at $(date)" | mail -s "Tomcat Restarted" "$EMAIL_TO"
+
+        # Log the restart
+        echo "Tomcat Restarted at $(date)" >> "$LOG_FILE"
+    fi
+
+    sleep $CHECK_INTERVAL_SECONDS
+done
