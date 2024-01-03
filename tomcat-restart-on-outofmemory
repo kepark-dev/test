@@ -1,0 +1,17 @@
+LOG_FILE="/path/to/tomcat/logs/catalina.out"
+CHECKPOINT_FILE="/path/to/checkpoint_file.txt"
+
+# Get the timestamp of the last check
+LAST_CHECK=$(cat "$CHECKPOINT_FILE" 2>/dev/null)
+
+# Get the timestamp of the latest OutOfMemoryError in the log file
+LATEST_OUT_OF_MEMORY=$(awk '/OutOfMemoryError/ { print $1, $2 }' "$LOG_FILE" | tail -n 1)
+
+# Compare timestamps and restart if a new OutOfMemoryError is found
+if [ "$LAST_CHECK" != "$LATEST_OUT_OF_MEMORY" ]; then
+    echo "Restarting Tomcat due to new OutOfMemoryError at $LATEST_OUT_OF_MEMORY"
+    /path/to/tomcat/bin/shutdown.sh
+    sleep 5
+    /path/to/tomcat/bin/startup.sh
+    echo "$LATEST_OUT_OF_MEMORY" > "$CHECKPOINT_FILE"
+fi
