@@ -1,0 +1,367 @@
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.InputStream;
+import java.sql.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+
+@RestController
+@RequestMapping("/sync")
+public class SyncController {
+
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/your_database";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = "password";
+
+    // Hold changes for review before committing
+    private List<Map<String, Object>> changes;
+
+    @PostMapping("/preview")
+    public List<Map<String, Object>> previewSync(@RequestParam("file") MultipartFile file) {
+        changes = new ArrayList<>();
+
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = new XSSFWorkbook(is);
+             Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+
+            Map<Integer, String[]> excelData = readExcelData(workbook);
+            Map<Integer, String[]> dbData = readDatabaseData(conn);
+
+            // Compare Excel data with Database data
+            for (Integer id : excelData.keySet()) {
+                if (!dbData.containsKey(id)) {
+                    // New record to insert
+                    changes.add(createChange("INSERT", id, excelData.get(id)));
+                } else if (!areEqual(excelData.get(id), dbData.get(id))) {
+                    // Existing record with different data, to update
+                    changes.add(createChange("UPDATE", id, excelData.get(id), dbData.get(id)));
+                }
+            }
+
+            // Check for records in the database not in Excel file, to delete
+            for (Integer id : dbData.keySet()) {
+                if (!excelData.containsKey(id)) {
+                    changes.add(createChange("DELETE", id, dbData.get(id)));
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return changes;
+    }
+
+    @PostMapping("/commit")
+    public String commitSync() {
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+            for (Map<String, Object> change : changes) {
+                String action = (String) change.get("action");
+                int id = (Integer) change.get("id");
+                String[] rowData = (String[]) change.get("data");
+
+                switch (action) {
+                    case "INSERT":
+                        insertData(conn, id, rowData);
+                        break;
+                    case "UPDATE":
+                        updateData(conn, id, rowData);
+                        break;
+                    case "DELETE":
+                        deleteData(conn, id);
+                        break;
+                }
+            }
+            changes.clear();
+            return "Data synchronization completed successfully!";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Error occurred during data synchronization.";
+        }
+    }
+
+    private Map<Integer, String[]> readExcelData(Workbook workbook) {
+        Map<Integer, String[]> data = new HashMap<>();
+        Sheet sheet = workbook.getSheetAt(0);
+        for (Row row : sheet) {
+            int id = (int) row.getCell(0).getNumericCellValue();
+            String[] rowData = {
+                row.getCell(1).getStringCellValue(),
+                row.getCell(2).getStringCellValue()
+            };
+            data.put(id, rowData);
+        }
+        return data;
+    }
+
+    private Map<Integer, String[]> readDatabaseData(Connection conn) throws SQLException {
+        Map<Integer, String[]> data = new HashMap<>();
+        String query = "SELECT id, column1, column2 FROM your_table";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String[] rowData = { rs.getString("column1"), rs.getString("column2") };
+                data.put(id, rowData);
+            }
+        }
+        return data;
+    }
+
+    private boolean areEqual(String[] row1, String[] row2) {
+        return row1[0].equals(row2[0]) && row1[1].equals(row2[1]);
+    }
+
+    private Map<String, Object> createChange(String action, int id, String[] data) {
+        Map<String, Object> change = new HashMap<>();
+        change.put("action", action);
+        change.put("id", id);
+        change.put("data", data);
+        return change;
+    }
+
+    private Map<String, Object> createChange(String action, int id, String[] newData, String[] oldData) {
+        Map<String, Object> change = new HashMap<>();
+        change.put("action", action);
+        change.put("id", id);
+        change.put("newData", newData);
+        change.put("oldData", oldData);
+        return change;
+    }
+
+    // Insert, update, and delete methods remain unchanged
+    private void insertData(Connection conn, int id, String[] rowData) throws SQLException {
+        String query = "INSERT INTO your_table (id, column1, column2) VALUES (?, ?, ?)";
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, id);
+            pstmt.setString(2, rowData[0]);
+            pstmt.setString(3, rowData[1]);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private void updateData(Connection conn, int id, String[] rowData) throws SQLException {
+        String query = "UPDATE your_table SET column1 = ?, column2 = ? WHERE id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, rowData[0]);
+            pstmt.setString(2, rowData[1]);
+            pstmt.setInt(3, id);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private void deleteData(Connection conn, int id) throws SQLException {
+        String query = "DELETE FROM your_table WHERE id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, id);
+            pstmt.executeUpdate();
+        }
+    }
+}
+
+
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.sql.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+
+@RestController
+@RequestMapping("/sync")
+public class SyncController {
+
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/your_database";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = "password";
+
+    private List<Map<String, Object>> changes;
+
+    @PostMapping("/preview")
+    public List<Map<String, Object>> previewSync(@RequestParam("file") MultipartFile file) {
+        changes = new ArrayList<>();
+
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = new XSSFWorkbook(is);
+             Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+
+            Map<Integer, String[]> excelData = readExcelData(workbook);
+            Map<Integer, String[]> dbData = readDatabaseData(conn);
+
+            for (Integer id : excelData.keySet()) {
+                if (!dbData.containsKey(id)) {
+                    changes.add(createChange("INSERT", id, excelData.get(id)));
+                } else if (!areEqual(excelData.get(id), dbData.get(id))) {
+                    changes.add(createChange("UPDATE", id, excelData.get(id)));
+                }
+            }
+
+            for (Integer id : dbData.keySet()) {
+                if (!excelData.containsKey(id)) {
+                    changes.add(createChange("DELETE", id, dbData.get(id)));
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return changes;
+    }
+
+    @PostMapping("/commit")
+    public String commitSync() {
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+            for (Map<String, Object> change : changes) {
+                String action = (String) change.get("action");
+                int id = (Integer) change.get("id");
+                String[] rowData = (String[]) change.get("data");
+
+                switch (action) {
+                    case "INSERT":
+                        insertData(conn, id, rowData);
+                        break;
+                    case "UPDATE":
+                        updateData(conn, id, rowData);
+                        break;
+                    case "DELETE":
+                        deleteData(conn, id);
+                        break;
+                }
+            }
+            changes.clear();
+            return "Data synchronization completed successfully!";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Error occurred during data synchronization.";
+        }
+    }
+
+    private Map<Integer, String[]> readExcelData(Workbook workbook) {
+        Map<Integer, String[]> data = new HashMap<>();
+        Sheet sheet = workbook.getSheetAt(0);
+        for (Row row : sheet) {
+            int id = (int) row.getCell(0).getNumericCellValue();
+            String[] rowData = {
+                row.getCell(1).getStringCellValue(),
+                row.getCell(2).getStringCellValue()
+            };
+            data.put(id, rowData);
+        }
+        return data;
+    }
+
+    private Map<Integer, String[]> readDatabaseData(Connection conn) throws SQLException {
+        Map<Integer, String[]> data = new HashMap<>();
+        String query = "SELECT id, column1, column2 FROM your_table";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String[] rowData = { rs.getString("column1"), rs.getString("column2") };
+                data.put(id, rowData);
+            }
+        }
+        return data;
+    }
+
+    private void insertData(Connection conn, int id, String[] rowData) throws SQLException {
+        String query = "INSERT INTO your_table (id, column1, column2) VALUES (?, ?, ?)";
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, id);
+            pstmt.setString(2, rowData[0]);
+            pstmt.setString(3, rowData[1]);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private void updateData(Connection conn, int id, String[] rowData) throws SQLException {
+        String query = "UPDATE your_table SET column1 = ?, column2 = ? WHERE id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, rowData[0]);
+            pstmt.setString(2, rowData[1]);
+            pstmt.setInt(3, id);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private void deleteData(Connection conn, int id) throws SQLException {
+        String query = "DELETE FROM your_table WHERE id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, id);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private boolean areEqual(String[] row1, String[] row2) {
+        return row1[0].equals(row2[0]) && row1[1].equals(row2[1]);
+    }
+
+    private Map<String, Object> createChange(String action, int id, String[] data) {
+        Map<String, Object> change = new HashMap<>();
+        change.put("action", action);
+        change.put("id", id);
+        change.put("data", data);
+        return change;
+    }
+}
+------------------------
+
+<input type="file" (change)="onFileSelected($event)">
+<button (click)="previewSync()">Preview Changes</button>
+
+<div *ngIf="changes.length">
+  <h3>Changes to be made:</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th>ID</th>
+        <th>Data</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let change of changes">
+        <td>{{ change.action }}</td>
+        <td>{{ change.id }}</td>
+        <td>{{ change.data }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <button (click)="commitSync()">Confirm and Sync</button>
+</div>
+
+------------------
+<!-- sync.component.html -->
+<input type="file" (change)="onFileSelected($event)">
+<button (click)="previewSync()">Preview Changes</button>
+
+<div *ngIf="changes.length">
+  <h3>Changes to be made:</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th>ID</th>
+        <th>Old Data</th>
+        <th>New Data</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let change of changes">
+        <td>{{ change.action }}</td>
+        <td>{{ change.id }}</td>
+        <td *ngIf="change.action === 'UPDATE'">{{ change.oldData | json }}</td>
+        <td>{{ change.data | json }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <button (click)="commitSync()">Confirm and Sync</button>
+</div>
