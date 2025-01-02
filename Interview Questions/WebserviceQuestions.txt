@@ -1,0 +1,55 @@
+Soap Binding style to be used : Document Literal
+SOAP Payload  - How the message looks like
+Valiadation - Can we validate the soap body using the xsd
+Operation name - Should this be part of soap body
+
+XJC 
+XML Schema ---->Java Classes
+
+SchemaGen
+Java Classes ----> XML schema
+
+Runtime 
+JavaClasses -----> XML
+
+
+Polymorphism and inheritance are two of the core idioms of object-oriented development.
+Polymorphism allows you to make a definition for a certain type of behavior, and have many different
+classes implement that behavior. Inheritance allows you to derive the behavior and definition of
+a class from a superclass.
+When defining a new class, it is possible to inherit definitions and state from a previously defined
+class, and then add new specific behavior, or override behavior for the new type.
+
+Java First 
+1. Create the Web Services Interface , Implementation and other bean Classes
+2. Annotate the web service interface and implementation with the
+3. Annotate the beans with JAXB annotations
+4. Define the Endpoint in the cxf-servlet.xml (When CXF Is Used)
+
+
+Wsdl:types – Has the xml schema that can be used to build the messages
+Wsdl:messages: the request and response xml messages built using the schema in the types section above.
+Wsdl:Operation: Each operation that the web service exposes.
+Wsdl:PortType: Groups the operations or web service methods together
+
+Physical Portion:
+Wsdl:Binding – We define the binding for all the operations which controls how the soap message is generated.
+Wsdl:service: The location/url of the service using which it can be accessed.
+
+
+
+Q. What are the steps to design a REST Web Service?
+A. Four Steps:
+Identify the objects/resources using the class diagram. There are the nouns in the object model.
+Create the URIs to access these resources.
+Choose the HTTP methods to bind to the operations on the resources.
+Identify the data format that needs to be supported and come up with sample requests and responses.
+
+
+Q. What are the steps to create a REST web service?
+A. Four Steps:
+Create the resource interface and implementation classes.
+Bind the methods on the resources to HTTP Methods using the JAX-WS (@GET, @POST, @PUT, @DELETE ETC) annotations.
+Bind the resources and their methods to URI Path using the JAX-WS (@Path) annotations.
+Configure/Publish the Resource in the cxf-servlet.xml
+Q
